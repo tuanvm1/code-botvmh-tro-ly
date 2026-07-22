@@ -113,7 +113,7 @@ def t_charts():
 def t_imports():
     import app.facebook.client, app.facebook.posting, app.facebook.ads, app.facebook.page  # noqa
     import app.ai.content, app.ai.analysis, app.ai.agent, app.ai.knowledge, app.ai.badminton  # noqa
-    import app.ai.kb_folder, app.ai.zalo_agent  # noqa
+    import app.ai.kb_folder, app.ai.zalo_agent, app.products  # noqa
     import app.bot.keyboards, app.bot.handlers, app.bot.jobs, app.bot.core  # noqa
     import app.admin.server, app.admin.supervisor, app.admin.zalo_supervisor  # noqa
     import app.alobo.monitor, app.alobo.source, app.alobo.runner  # noqa
@@ -410,6 +410,26 @@ def t_zalo_agent():
         json.loads(ZA._dispatch("ghi_nho_ve_khach", {"dieu_can_nho": "trình độ trung bình"}, "u999", "An"))
         assert "trung bình" in store.customer_memory("u999")["notes"]
         assert "KHÁCH QUEN" in ZA._system("", "", store.customer_memory_text("u123"))
+        # --- Kho sản phẩm + luật BÁN HÀNG của agent (logic thuần, không cần AI) ---
+        assert "BÁN HÀNG & CHỐT ĐƠN" not in ZA._system("", "")                       # chưa có kho → không nhắc bán đồ
+        sysp_sale = ZA._system("", "", "", "KHO HÀNG SHOP ĐANG CÓ — tổng 5 sản phẩm.", "0339.288.166")
+        assert "BÁN HÀNG & CHỐT ĐƠN" in sysp_sale and "KHAN HIẾM" in sysp_sale        # có kho → có luật khan hiếm
+        sysp_push = ZA._system("", "", "", "KHO HÀNG SHOP ĐANG CÓ.", "0339.288.166", push_phone=True)
+        assert "BẮT BUỘC" in sysp_push and "0339.288.166" in sysp_push                # lượt 3 → chỉ thị cứng đưa số
+        # Đếm lượt tư vấn SẢN PHẨM: tin bot có GIÁ & KHÔNG phải chuyện sân
+        store.add_message("t_adv", "Giày Yonex 2,95tr ạ, dễ hết size", is_group=False, is_self=True)
+        store.add_message("t_adv", "Còn mẫu 1,5tr nữa 💪", is_group=False, is_self=True)
+        store.add_message("t_adv", "Sân VMH 80k/giờ, đặt qua link alobo nha", is_group=False, is_self=True)  # SÂN
+        assert ZA._product_advice_turns("t_adv") == 2
+        # ÉP chèn số khi bot quên (đúng ngữ cảnh sản phẩm) — nhưng không chèn lặp, không chèn khi đang nói SÂN
+        assert "0339.288.166" in ZA._ensure_phone_closing("Vợt này 2tr đẹp lắm ạ", True, "0339.288.166", True)
+        assert ZA._ensure_phone_closing("gọi 0339.288.166 nhé", True, "0339.288.166", True).count("0339.288.166") == 1
+        assert "0339" not in ZA._ensure_phone_closing("Sân còn khung 19h ạ", True, "0339.288.166", False)
+        # Rào an toàn (theo review 22/7): dù đã dùng công cụ SP, câu nói chuyện SÂN vẫn KHÔNG bị chèn số
+        assert "0339" not in ZA._ensure_phone_closing("Còn sân 19h, 90k/tiếng, đặt qua link alobo nha", True, "0339.288.166", True)
+        assert "0339" not in ZA._ensure_phone_closing(ZA._REFUSAL, True, "0339.288.166", True)  # sau câu từ chối → không chèn
+        # Số dạng DẤU CÁCH → nhận ra đã có, không chèn trùng (so theo chữ số)
+        assert ZA._ensure_phone_closing("Vợt 2tr nha, gọi 0339 288 166 nhé", True, "0339.288.166", True).count("0339") == 1
         # Chốt chặn ĐẦU RA: lộ tên công cụ / dấu rào nội bộ → thay bằng câu từ chối
         assert ZA._finalize("đây là input_schema", "", []) == ZA._REFUSAL
         assert ZA._finalize("gọi kiem_tra_lich_san", "", []) == ZA._REFUSAL
@@ -417,6 +437,66 @@ def t_zalo_agent():
         assert "phishing.example" not in ZA._finalize("bấm https://phishing.example nha", "kb sạch", [])
     finally:
         als.fetch_schedule = of
+        db.set_db_path(db.DEFAULT_DB)
+        tmp.unlink(missing_ok=True)
+
+
+def t_products():
+    """Kho sản phẩm: đọc file Excel (gộp phiên bản, dò cột tồn) + tra cứu cho agent."""
+    import json
+    from app import db, store, products
+    tmp = _use_tmp_db()
+    xlsx = db.DATA_DIR / "selftest_products.xlsx"
+    try:
+        # Hàm thuần: phân nhóm / nhãn hiệu / định dạng tiền
+        assert products.categorize("Vợt LN BLADEX") == "Vợt"
+        assert products.categorize("Giày Yonex Eclipsion") == "Giày"
+        assert products.brand_of("Vợt LN 6000") == "Lining" and products.brand_of("Vợt Yonex 88D") == "Yonex"
+        assert products.money(2950000) == "2,95tr" and products.money(150000) == "150k"
+        # Tạo file .xlsx nhỏ: 1 sản phẩm 2 phiên bản (điền xuôi tên cha) + cột 'Tồn kho'
+        import openpyxl
+        wb = openpyxl.Workbook(); ws = wb.active
+        ws.append(["Tên sản phẩm*", "Thuộc tính 1", "Giá trị thuộc tính 1", "Thuộc tính 2",
+                   "Giá trị thuộc tính 2", "Tên phiên bản sản phẩm", "Mã SKU*", "Đơn vị",
+                   "PL_Giá bán lẻ", "Tồn kho"])
+        ws.append(["Giày Yonex Test", "Màu sắc", "Đỏ", "Size", "42",
+                   "Giày Yonex Test - Đỏ - 42", "SKU1", "đôi", "2000000", "3"])
+        ws.append(["", "", "Đỏ", "", "43", "Giày Yonex Test - Đỏ - 43", "SKU2", "đôi", "2000000", "0"])
+        ws.append(["Vợt Lining Test", "Kích thước", "Mặc định", "", "",
+                   "Vợt Lining Test", "SKU3", "cái", "1500000", ""])
+        wb.save(str(xlsx))
+        rows = products.parse_xlsx(str(xlsx))
+        assert len(rows) == 3
+        v2 = rows[1]                                   # phiên bản 2 phải GỘP tên cha + có Size 43
+        assert v2["product_name"] == "Giày Yonex Test" and "Size: 43" in v2["attrs"]
+        assert v2["stock_qty"] == 0 and v2["in_stock"] == 0            # tồn 0 → hết
+        assert rows[0]["stock_qty"] == 3 and rows[0]["brand"] == "Yonex"
+        assert rows[2]["attrs"] == ""                                  # 'Mặc định' bị bỏ
+        # Nạp kho + tra cứu (chỉ tính hàng CÒN bán)
+        assert store.replace_products(rows, source="selftest.xlsx") == {"products": 2, "variants": 3}
+        summ = products.catalog_summary()
+        assert "Giày" in summ and "Vợt" in summ and "2 sản phẩm" in summ
+        r = json.loads(products.search_for_agent("giày Yonex size 42"))
+        assert r["ket_qua"] and r["ket_qua"][0]["ten"] == "Giày Yonex Test"
+        assert r["ket_qua"][0].get("ton_kho") == 3 and r["ket_qua"][0].get("sap_het") is True
+        # 'nước uống' không được dính giày/vợt (khớp trọn từ)
+        assert json.loads(products.search_for_agent("bán nước uống không"))["ket_qua"] == []
+        # Dò cột TỒN chặt: 'Tổng số lượng' (không dấu = 'tong') KHÔNG bị nhận nhầm là cột tồn
+        assert products._find_stock_col(["Tên", "Tổng số lượng", "Tồn kho"]) == 2
+        assert products._find_stock_col(["Tên", "Tổng số lượng"]) == -1
+        # AN TOÀN: tải file SAI (đọc ra 0 sản phẩm) KHÔNG được xoá kho đang có
+        bad = db.DATA_DIR / "selftest_bad.xlsx"
+        wbb = openpyxl.Workbook(); wsb = wbb.active
+        wsb.append(["Cột lạ A", "Cột lạ B"]); wsb.append(["x", "y"])
+        wbb.save(str(bad))
+        res_bad = products.import_from_xlsx(str(bad), source="sai.xlsx")
+        bad.unlink(missing_ok=True)
+        assert res_bad.get("variants") == 0 and res_bad.get("khong_thay") is True
+        assert store.count_products()["variants"] == 3          # KHO CŨ CÒN NGUYÊN (không bị xoá)
+        store.clear_products()
+        assert store.count_products()["variants"] == 0 and products.catalog_summary() == ""
+    finally:
+        xlsx.unlink(missing_ok=True)
         db.set_db_path(db.DEFAULT_DB)
         tmp.unlink(missing_ok=True)
 
@@ -434,6 +514,7 @@ if __name__ == "__main__":
     check("Bot hiểu ý hỏi sân + trả đúng giờ (mock)", t_badminton_smart)
     check("Bộ não bot đọc kho Obsidian (thư mục .md)", t_kb_folder)
     check("Agent Zalo: công cụ + luật bảo mật (mock)", t_zalo_agent)
+    check("Kho sản phẩm: đọc Excel + tra cứu bán hàng", t_products)
     check("Gửi tin Zalo Bot (không token → an toàn)", t_zalo_transport)
 
     ok = sum(1 for r in results if r)

@@ -186,6 +186,60 @@ HOME = """
  <div style="margin-top:14px"><a class="btn" href="{{ url_for('knowledge_form', kid=0) }}">➕ Thêm kiến thức</a></div>
  <p class="hint">Mẹo: bạn cũng có thể nhắn nhanh cho bot Telegram: <code>/ghinho &lt;nội dung&gt;</code></p>
 </div>
+
+<div class="card">
+ <h2>🛒 Kho sản phẩm — để bot tư vấn &amp; CHỐT ĐƠN</h2>
+ <p class="muted">Tải file Excel sản phẩm (xuất từ Sapo). Bot TỰ đọc, hiểu sản phẩm &amp; giá, rồi
+  ƯU TIÊN tư vấn đúng hàng ĐANG CÓ để tăng chốt đơn. Vài ngày tải bản mới = cập nhật kho
+  (thay MỚI toàn bộ: hàng còn trong file = còn bán; hàng biến mất = bot tự ngừng tư vấn).</p>
+ {% if pmeta.variants %}
+  <p>📦 Đang có <b>{{ pmeta.products }}</b> sản phẩm (<b>{{ pmeta.variants }}</b> phiên bản)
+    {% if pmeta.updated_vi %} · cập nhật <b>{{ pmeta.updated_vi }}</b>{% endif %}
+    {% if pmeta.source %} · từ file <span class="muted">{{ pmeta.source }}</span>{% endif %}</p>
+ {% else %}
+  <p class="muted">⚠️ Chưa có sản phẩm nào — hãy tải file Excel lên để bot bắt đầu tư vấn bán hàng.</p>
+ {% endif %}
+ <form method="post" action="{{ url_for('products_upload') }}" enctype="multipart/form-data">
+  <label>Chọn file Excel (.xlsx) rồi bấm Tải lên</label>
+  <input type="file" name="file" accept=".xlsx" required>
+  <div style="margin-top:12px">
+   <button type="submit">⬆️ Tải lên &amp; cập nhật kho</button>
+   {% if pmeta.variants %}
+   <a class="btn small grey" href="{{ url_for('products_preview') }}">👁 Xem thử</a>
+   <a class="btn small red" href="{{ url_for('products_clear') }}"
+      onclick="return confirm('Xoá TOÀN BỘ kho sản phẩm? Bot sẽ ngừng tư vấn sản phẩm cho tới khi tải lại.')">🗑 Xoá kho</a>
+   {% endif %}
+  </div>
+ </form>
+ <form method="post" action="{{ url_for('products_save_phone') }}" style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px">
+  <label>📞 Số điện thoại tư vấn / chốt đơn
+    <span class="hint">bot đưa số này cho khách khi đã tư vấn sản phẩm 2–3 lượt (để trống = bot mời khách để lại số)</span></label>
+  <input name="sales_phone" value="{{ s.sales_phone }}" placeholder="vd: 0339.288.166">
+  <div style="margin-top:10px"><button type="submit">💾 Lưu số điện thoại</button></div>
+ </form>
+</div>
+"""
+
+PRODUCTS_PREVIEW = """
+<div class="card">
+ <h2>👁 Xem thử kho sản phẩm</h2>
+ <p class="muted">Đây là những gì BOT hiểu từ file của bạn. Kiểm tra tên/giá/nhóm hàng đọc đúng chưa.</p>
+ <div class="flash">🧠 Bản tóm tắt bot luôn thấy:<br>{{ summary }}</div>
+ <table>
+  <tr><th>Sản phẩm</th><th>Nhóm</th><th>Giá</th><th>Lựa chọn (màu/size…)</th><th>Còn</th></tr>
+  {% for r in rows %}
+  <tr>
+   <td>{{ r.product_name }}</td>
+   <td>{{ r.category }}</td>
+   <td>{{ r.price_vi }}</td>
+   <td class="muted">{{ r.attrs or '—' }}</td>
+   <td>{% if r.in_stock %}✅{% if r.stock_qty is not none %} ({{ r.stock_qty }}){% endif %}{% else %}❌{% endif %}</td>
+  </tr>
+  {% endfor %}
+ </table>
+ <p class="hint">Chỉ hiển thị {{ rows|length }} dòng đầu (kho có {{ pmeta.variants }} phiên bản).</p>
+ <div style="margin-top:12px"><a class="btn grey" href="{{ url_for('home') }}">← Về trang chính</a></div>
+</div>
 """
 
 KNOWLEDGE_FORM = """
@@ -388,11 +442,24 @@ def _render(tpl, **kw):
     return render_template_string(BASE, body=body, flash=flash)
 
 
+def _pmeta_vi() -> dict:
+    """Thông tin kho sản phẩm + mốc cập nhật đã Việt hoá (cho trang quản trị)."""
+    m = store.products_meta()
+    m["updated_vi"] = ""
+    if m.get("updated_at"):
+        try:
+            from datetime import datetime as _dt
+            m["updated_vi"] = _dt.fromisoformat(m["updated_at"]).strftime("%d/%m/%Y %H:%M")
+        except ValueError:
+            pass
+    return m
+
+
 @app.route("/")
 def home():
     return _render(HOME, s=store.all_settings(), pages=store.list_pages(),
                    venues=store.list_venues(), zalos=store.list_zalo(),
-                   knowledge=store.list_knowledge(),
+                   knowledge=store.list_knowledge(), pmeta=_pmeta_vi(),
                    bot_running=supervisor.is_running(), url_for=url_for)
 
 
@@ -413,7 +480,7 @@ def bot_ctl(action: str):
 def save_settings():
     for key in ["telegram_bot_token", "telegram_owner_chat_id", "anthropic_api_key",
                 "anthropic_model", "ai_provider", "gemini_api_key", "gemini_model",
-                "fb_api_version", "ads_max_daily_budget_vnd",
+                "fb_api_version", "ads_max_daily_budget_vnd", "sales_phone",
                 "daily_ads_report_hour", "daily_post_draft_hour"]:
         if key in request.form:
             store.set_setting(key, request.form.get(key, "").strip())
@@ -647,6 +714,53 @@ def page_test(page_id: int):
     else:
         parts.append("Quảng cáo: chưa có token")
     return redirect(url_for("home", msg=f"[{p['name']}] " + " | ".join(parts)))
+
+
+@app.route("/products/upload", methods=["POST"])
+def products_upload():
+    """Chủ tải file Excel Sapo → đọc & THAY MỚI toàn bộ kho sản phẩm."""
+    from .. import products
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return redirect(url_for("home", msg="Chưa chọn file — bấm 'Chọn file' rồi Tải lên."))
+    if not f.filename.lower().endswith(".xlsx"):
+        return redirect(url_for("home", msg="File phải là Excel .xlsx (không phải .xls cũ). Hãy xuất 'file sản phẩm' từ Sapo dạng .xlsx."))
+    dest = db.DATA_DIR / "products_upload.xlsx"
+    try:
+        f.save(str(dest))
+        res = products.import_from_xlsx(str(dest), source=f.filename)
+    except ImportError:
+        return redirect(url_for("home", msg="Máy chủ thiếu thư viện đọc Excel (openpyxl) — báo kỹ thuật cài giúp."))
+    except Exception as e:  # noqa: BLE001
+        app.logger.exception("products upload")
+        return redirect(url_for("home", msg=f"Đọc file LỖI ✖: {e}. Kiểm tra lại có đúng file xuất từ Sapo không."))
+    if not res.get("variants"):
+        return redirect(url_for("home", msg="Đọc xong nhưng KHÔNG thấy sản phẩm nào — KHO CŨ VẪN GIỮ NGUYÊN. "
+                                            "Kiểm tra file có đúng cột 'Tên sản phẩm', 'Mã SKU', 'Giá bán lẻ' không."))
+    return redirect(url_for("home", msg=f"Đã cập nhật kho ✔ {res['products']} sản phẩm "
+                                        f"({res['variants']} phiên bản). Bot tư vấn theo kho này ngay."))
+
+
+@app.route("/products/preview")
+def products_preview():
+    from .. import products
+    rows = store.list_products(limit=40)
+    for r in rows:
+        r["price_vi"] = products.money(r.get("price"))
+    return _render(PRODUCTS_PREVIEW, rows=rows, summary=products.catalog_summary(),
+                   pmeta=store.products_meta(), url_for=url_for)
+
+
+@app.route("/products/clear")
+def products_clear():
+    store.clear_products()
+    return redirect(url_for("home", msg="Đã xoá kho sản phẩm ✔ (bot ngừng tư vấn sản phẩm tới khi tải lại)"))
+
+
+@app.route("/products/save-phone", methods=["POST"])
+def products_save_phone():
+    store.set_setting("sales_phone", request.form.get("sales_phone", "").strip())
+    return redirect(url_for("home", msg="Đã lưu số điện thoại tư vấn ✔ (bot dùng ngay)"))
 
 
 @app.route("/internal/zalo-reply", methods=["POST"])

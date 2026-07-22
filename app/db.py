@@ -179,6 +179,24 @@ def _migrate(conn: sqlite3.Connection) -> None:
     # Sổ tay nhớ từng khách (agent Zalo cá nhân hoá). Tạo nếu chưa có (không mất dữ liệu cũ).
     conn.execute("""CREATE TABLE IF NOT EXISTS customer_memory (
         uid TEXT PRIMARY KEY, name TEXT, notes TEXT, updated_at TEXT)""")
+    # Kho sản phẩm (chủ tải file Excel Sapo lên → bot tư vấn & chốt đơn theo hàng ĐANG CÓ).
+    # Mỗi dòng = 1 PHIÊN BẢN (variant); nhiều phiên bản gộp về 1 product_name khi tư vấn.
+    conn.execute("""CREATE TABLE IF NOT EXISTS products (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_name  TEXT NOT NULL,   -- tên sản phẩm cha (đã điền xuôi cho các dòng phiên bản)
+        variant_name  TEXT,            -- tên phiên bản đầy đủ (vd 'Giày ... - Xanh - 42')
+        sku           TEXT,
+        brand         TEXT,            -- nhãn hiệu suy ra từ tên (Yonex/Lining/Victor...)
+        category      TEXT,            -- nhóm hàng suy ra từ tên (Vợt/Giày/Dây cước/Cầu...)
+        attrs         TEXT,            -- 'Màu sắc: Tím, Size: 42' (bỏ 'Mặc định')
+        price         REAL,
+        unit          TEXT,
+        image_url     TEXT,
+        in_stock      INTEGER DEFAULT 1,  -- 1 = còn bán (có trong file / tồn > 0)
+        stock_qty     INTEGER,            -- số tồn nếu file có cột tồn; NULL nếu file không có
+        created_at    TEXT
+    )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_products_name ON products(product_name)")
 
 
 @contextmanager

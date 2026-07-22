@@ -14,6 +14,8 @@ from . import db
 DEFAULTS = {
     "telegram_bot_token": "",
     "telegram_owner_chat_id": "",
+    # Số điện thoại tư vấn/chốt đơn — bot đưa cho khách khi tư vấn sản phẩm quá 2-3 lượt.
+    "sales_phone": "",
     "anthropic_api_key": "",
     "anthropic_model": "claude-haiku-4-5-20251001",
     # Chọn "bộ não" AI: claude | gemini (đổi ở trang quản trị, không cần code)
@@ -399,3 +401,61 @@ def customer_memory_text(uid: str) -> str:
     head = f"KHÁCH QUEN{f' — tên {who}' if who else ''} (những điều ĐÃ BIẾT về khách này từ các lần trước, "
     head += "dùng để chăm sóc thân thiết & đúng nhu cầu, ĐỪNG hỏi lại những gì đã biết):"
     return head + "\n" + m["notes"]
+
+
+# ---------- Kho sản phẩm (chủ tải file Excel Sapo → bot tư vấn & chốt đơn) ----------
+PRODUCT_FIELDS = ["product_name", "variant_name", "sku", "brand", "category",
+                  "attrs", "price", "unit", "image_url", "in_stock", "stock_qty"]
+
+
+def replace_products(rows: list[dict], source: str = "") -> dict:
+    """THAY MỚI toàn bộ kho: xoá hết rồi nạp danh sách mới (mỗi lần chủ tải file = 1 bản chụp
+    hàng ĐANG CÓ). Trả về số lượng sau khi nạp."""
+    now = datetime.now().isoformat(timespec="seconds")
+    payload = [tuple(r.get(k) for k in PRODUCT_FIELDS) + (now,) for r in rows]
+    with db.get_conn() as conn:
+        conn.execute("DELETE FROM products")
+        if payload:
+            conn.executemany(
+                f"INSERT INTO products({','.join(PRODUCT_FIELDS)}, created_at) "
+                f"VALUES ({','.join(['?'] * (len(PRODUCT_FIELDS) + 1))})", payload)
+    set_setting("products_updated_at", now)
+    set_setting("products_source", source or "")
+    return count_products()
+
+
+def clear_products() -> None:
+    with db.get_conn() as conn:
+        conn.execute("DELETE FROM products")
+    set_setting("products_updated_at", "")
+    set_setting("products_source", "")
+
+
+def count_products() -> dict:
+    with db.get_conn() as conn:
+        variants = conn.execute("SELECT COUNT(*) c FROM products").fetchone()["c"]
+        prods = conn.execute("SELECT COUNT(DISTINCT product_name) c FROM products").fetchone()["c"]
+    return {"products": prods, "variants": variants}
+
+
+def products_meta() -> dict:
+    """Thông tin tóm tắt kho để hiển thị ở trang quản trị."""
+    m = count_products()
+    m["updated_at"] = get_setting("products_updated_at", "")
+    m["source"] = get_setting("products_source", "")
+    return m
+
+
+def list_products(limit: int = 30) -> list[dict]:
+    """Danh sách phiên bản (để chủ XEM THỬ đọc đúng chưa)."""
+    with db.get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM products ORDER BY product_name, id LIMIT ?", (int(limit),)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def instock_product_rows() -> list[dict]:
+    """Mọi phiên bản CÒN BÁN (để agent tra cứu/tư vấn)."""
+    with db.get_conn() as conn:
+        rows = conn.execute("SELECT * FROM products WHERE in_stock=1 ORDER BY product_name, id").fetchall()
+    return [dict(r) for r in rows]

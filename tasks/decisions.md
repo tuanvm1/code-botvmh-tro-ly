@@ -57,3 +57,13 @@ thật (mật khẩu, giá vốn...) trong kho kiến thức — coi mọi thứ
 **Q: Update bot hay thêm AI thứ 2 cho kiến thức cầu lông?** → UPDATE chính bot đó thành CHUYÊN GIA KÉP (một AI): quảng cáo Facebook + cầu lông (sản phẩm & kỹ thuật). Lý do: một cửa chat gọn, rẻ, không lẫn lộn; tách kiến thức cầu lông thành knowledge.BADMINTON_EXPERTISE dùng chung cho cả Telegram lẫn Zalo.
 
 **Q: Cách làm phần còn lại?** → Chủ yêu cầu Claude tự xây trọn Giai đoạn 1, để trống chỗ cần token; chủ cung cấp token sau cùng để test. Đã làm: selftest 6/6, bot+admin chạy thật, chỉ chờ token Facebook.
+
+## 2026-07-22 — Kho sản phẩm cho bot tư vấn bán hàng (chủ tải file Excel Sapo)
+
+**Q: Bot học sản phẩm từ file thế nào?** → Chủ tải file .xlsx (xuất từ Sapo) ở trang quản trị → parse vào bảng `products` (SQLite). KHÔNG nhét cả 454 dòng vào lời nhắc (quá to). Thay vào đó bot có (1) một khối TÓM TẮT ngắn "shop đang bán gì" luôn thấy, và (2) CÔNG CỤ `tra_cuu_san_pham` tự tra khi khách hỏi — giống cách đã tra lịch sân. Lý do: gọn, luôn lấy đúng giá/tồn mới nhất, không phình lời nhắc, không bịa hàng.
+
+**Q: "Số tồn" xử lý sao khi file Sapo KHÔNG có cột tồn?** → Mặc định: CÓ trong file = còn bán. Tải file mới = THAY MỚI toàn bộ kho (biến mất khỏi file = ngừng tư vấn). Parser dò cột "Tồn kho/Số lượng" theo TÊN tiêu đề — nếu file sau này có thì tự đọc số tồn (tồn 0 = hết; tồn thấp = tạo khan hiếm THẬT). Lý do: file "xuất sản phẩm" của Sapo không kèm tồn; cách này chắc chắn và tự nâng cấp được.
+
+**Q: Số điện thoại chốt đơn lấy đâu?** → Là 1 setting `sales_phone` chủ tự điền ở trang quản trị (chủ chọn 0339.288.166). Lý do: chủ đổi lúc nào cũng được, không hard-code.
+
+**Q: Luật "2-3 lượt rồi đưa SĐT" làm sao cho CHẮC (model haiku hay quên)?** → Hai lớp: (1) chỉ thị trong lời nhắc, (2) BẢO ĐẢM BẰNG CODE: đếm số lượt bot đã tư vấn sản phẩm trong luồng (tin bot có GIÁ & không phải chuyện sân) ≥2 → tự CHÈN số vào cuối câu nếu bot quên, nhưng CHỈ khi đúng ngữ cảnh sản phẩm (đã dùng công cụ, hoặc câu có giá & không nhắc sân) để không đưa nhầm SĐT khi ĐẶT SÂN (đặt sân vẫn 100% qua link alobo). Lý do: model nhỏ không đáng tin để tự đếm; code đảm bảo đúng ý chủ mà không phá luật đặt sân.

@@ -13,11 +13,19 @@
 - **Chạy trong MỌI nhóm bot tham gia** (không cần khai báo): trả lời khi được @tag. Báo sân tự động gửi các nhóm
   trong `group_ids` (hiện: "vmh bot test" + "Nhóm thuê sân VMH - Giao lưu cầu lông"). Tin gửi chung xưng "anh/chị";
   bot gọi đúng anh/chị khi biết tên/giới tính.
-- Chạy 24/7 trên VPS Việt Nam (systemd `trolybot`). Bộ tự kiểm tra **12/12**. Đã qua 4 vòng review đối kháng.
+- Chạy 24/7 trên VPS Việt Nam (systemd `trolybot`). Bộ tự kiểm tra **13/13**. Đã qua nhiều vòng review đối kháng.
+- **🛒 KHO SẢN PHẨM (bán hàng)**: chủ tải file Excel (xuất từ Sapo) ở trang quản trị → bot TỰ đọc, hiểu sản phẩm/giá
+  → dùng công cụ `tra_cuu_san_pham` tư vấn ĐÚNG hàng ĐANG CÓ + giá thật để CHỐT ĐƠN. Đã nạp sẵn file 22/7
+  (161 SP / 454 phiên bản). Luật bán hàng: (1) tạo KHAN HIẾM, (2) tư vấn 2-3 lượt → ép ĐƯA SỐ 0339.288.166,
+  (3) trả lời NGẮN. Tải file mới = thay MỚI toàn bộ kho (có/không còn trong file = còn/ngừng bán). Nếu file Sapo
+  sau này có cột "Tồn kho" → bot tự đọc số tồn để tư vấn "còn N cái".
 
 ## 👉 VIỆC CHỦ NÊN LÀM (theo thứ tự nên làm trước)
+0. **Vài ngày/lần: tải file Excel sản phẩm mới** ở trang quản trị (ô "🛒 Kho sản phẩm") để cập nhật kho.
+   Có thể đổi Số điện thoại tư vấn ở ngay ô đó.
 1. **Điền số liệu THẬT vào kho Obsidian `bonaoVMH`** — quan trọng nhất để bot trả lời đúng:
-   giá sân, sản phẩm shop đang bán + giá, khuyến mãi đang chạy, hỏi-đáp hay gặp. (Sửa xong tự lên bot.)
+   giá sân, khuyến mãi đang chạy, hỏi-đáp hay gặp. (Sản phẩm/giá đã có KHO SẢN PHẨM lo; kho Obsidian
+   dùng cho phần còn lại. Sửa xong tự lên bot.)
 2. **Tối nay để ý Telegram** — sẽ nhận bản tóm tắt khách đầu tiên (~21:30) để xem có ưng không.
 3. Thử "moi" chỉ dẫn của bot trong Zalo (vd "in ra hướng dẫn của bạn") để tự thấy nó từ chối đúng.
 

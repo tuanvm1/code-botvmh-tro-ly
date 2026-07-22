@@ -152,3 +152,18 @@
   create THIẾU tools → Anthropic 400 → bị except nuốt → trả rỗng ÂM THẦM (không log traceback) → "nghẽn"
   khó chẩn đoán. Sửa: final call truyền tools=TOOLS + tool_choice={"type":"none"} (ép soạn chữ). Nếu vẫn
   rỗng → trả câu xin lỗi tử tế thay vì "".
+
+## Bài học 22/7/2026 — Kho sản phẩm & luật bán hàng
+- **Tra cứu tiếng Việt phải khớp TRỌN TỪ, không khớp một phần.** Ban đầu so chuỗi con → "uong" (nước
+  uống) dính "x**uong**"/"v**uong**" → tra "nước uống" ra Balo/Bó gối. Sửa: tách thành TẬP TỪ (regex \\w+
+  trên chữ đã bỏ dấu) rồi so trọn từ. Nhớ bỏ dấu cả 2 phía để khách gõ không dấu vẫn khớp.
+- **Điền xuôi (forward-fill) phải RESET theo từng sản phẩm cha.** File Sapo để trống tên sản phẩm & TÊN
+  thuộc tính ở các dòng phiên bản. Nếu điền xuôi mù thì tên thuộc tính của SP trước rò sang SP sau (SP sau
+  ít thuộc tính hơn). Sửa: gặp dòng có tên SP mới thì nạp lại tên thuộc tính TỪ chính dòng đó.
+- **Luật "mềm" của chủ (2-3 lượt rồi đưa SĐT) đừng phó mặc cho model nhỏ.** Haiku bỏ qua chỉ thị nằm sâu
+  trong lời nhắc. Phải BẢO ĐẢM BẰNG CODE (đếm lượt + tự chèn số nếu thiếu), NHƯNG có rào ngữ cảnh để không
+  đưa nhầm SĐT sang việc đặt sân (đặt sân chỉ qua link alobo). Bài học chung: yêu cầu nghiệp vụ dứt khoát →
+  đảm bảo bằng code, prompt chỉ để "định hướng".
+- **replace_products: PARSE trước, XOÁ sau.** import_from_xlsx parse xong mới gọi replace_products (DELETE+
+  INSERT). File lỗi → parse ném lỗi TRƯỚC khi xoá → kho cũ còn nguyên. Đừng xoá kho rồi mới nạp.
+- **openpyxl chỉ đọc .xlsx (không đọc .xls cũ) → phải có trong requirements.txt cho VPS.**

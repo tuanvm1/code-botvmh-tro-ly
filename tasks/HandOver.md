@@ -1,5 +1,21 @@
 # Bàn giao — Trợ lý tự động (cập nhật 22/7/2026)
 
+## (22/7 tối) 🛒 KHO SẢN PHẨM — bot tư vấn & CHỐT ĐƠN theo file Excel Sapo (MỚI)
+Chủ tải file .xlsx (xuất từ Sapo) ở trang quản trị → bot tư vấn đúng hàng ĐANG CÓ + giá thật, tạo khan hiếm,
+2-3 lượt rồi ĐƯA SỐ. ĐÃ LÀM & TEST (selftest 13/13 + e2e bot thật + soát đối kháng 18 agent, đã sửa 5 lỗi).
+- **File mới**: `app/products.py` (parse xlsx: điền xuôi tên cha + RESET tên thuộc tính theo SP; `_find_stock_col`
+  khớp TRỌN TỪ 'ton'; suy nhãn/nhóm; `catalog_summary`; `search_for_agent` khớp trọn từ + bỏ dấu; chỉ hàng in_stock).
+- **db.py**: bảng `products` (migrate). **store.py**: `sales_phone` default + replace/clear/count/list/instock + `products_meta`.
+  `import_from_xlsx`: parse ra 0 dòng → KHÔNG xoá kho cũ (chống mất hàng khi tải nhầm file). replace = PARSE trước, DELETE sau.
+- **admin/server.py**: ô "Kho sản phẩm" + route `/products/upload|preview|clear|save-phone`. **ai/zalo_agent.py**: công cụ
+  `tra_cuu_san_pham` + khối `_sales_block` (khan hiếm/2-3 lượt/ngắn) + `_product_advice_turns` + `_ensure_phone_closing`
+  (ép SĐT lượt 3 BẰNG CODE; rào: không chèn vào câu SÂN/sau _REFUSAL/trùng số; đặt sân vẫn chỉ qua link alobo).
+- **requirements.txt**: `openpyxl>=3.1`.
+- ⚠️ **CHƯA DEPLOY LÊN VPS**. Để bot THẬT (VPS) dùng: (1) git push + trên VPS `git pull` (repo code-botvmh-tro-ly)
+  + `pip install openpyxl` + `systemctl restart trolybot`; (2) DỮ LIỆU sản phẩm KHÔNG theo git (data/ gitignore) →
+  phải TẢI FILE .xlsx trên admin của VPS, HOẶC chạy `products.import_from_xlsx(path)` trực tiếp trên VPS. Đã nạp sẵn
+  vào DB **máy Mac** (161 SP/454 pb) + đặt sales_phone=0339.288.166 để test; VPS cần nạp riêng.
+
 ## (22/7 chiều) SỬA "NGHẼN" khi NHIỀU NGƯỜI HỎI CÙNG LÚC — quan trọng
 Chủ báo: câu 1 OK, câu 2 nghẽn; lo 100 người tag cùng lúc. GỐC RỄ: `app/admin/server.py::run` chạy Flask
 DEV SERVER 1-LUỒNG (`app.run`) → chỉ xử 1 tin/lúc; câu đọc lịch chậm (~40-80s) ôm nguyên máy chủ → tin khác nghẽn.
