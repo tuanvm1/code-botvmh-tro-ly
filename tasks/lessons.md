@@ -143,3 +143,12 @@
   chèn '\n  ' giữa "cấu trúc" → câu từ chối bị gãy. Để câu cần-nguyên-văn trên 1 dòng liền.
 - **Agent tool-use: hết MAX_TOOL_ROUNDS phải ép soạn câu cuối** (gọi model KHÔNG kèm tools) thay vì trả rỗng,
   kẻo khách nhận câu xin lỗi dù đã có đủ dữ liệu từ công cụ.
+
+## Bài học 22/7/2026 — Agent hay "nghẽn" (trả rỗng)
+- **Agent tool-use PHẢI có thử-lại khi AI quá tải (529).** Bản agent mới gọi client.messages.create THẲNG
+  (không như llm.chat có retry 3 lần) → Anthropic nghẽn 1 nhịp là trả rỗng → khách nhận câu "nghẽn". Sửa:
+  bọc _msg_create có retry (dùng llm._is_retryable).
+- **Lượt "chốt câu cuối" (sau khi hết vòng công cụ) PHẢI vẫn truyền tools.** Lịch sử có tool_use mà gọi
+  create THIẾU tools → Anthropic 400 → bị except nuốt → trả rỗng ÂM THẦM (không log traceback) → "nghẽn"
+  khó chẩn đoán. Sửa: final call truyền tools=TOOLS + tool_choice={"type":"none"} (ép soạn chữ). Nếu vẫn
+  rỗng → trả câu xin lỗi tử tế thay vì "".

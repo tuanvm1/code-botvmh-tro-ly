@@ -12,6 +12,7 @@ Khác bản cũ (badminton.answer chạy đường ray cố định): ở đây 
 from __future__ import annotations
 
 import json
+import time
 
 from ..config import config
 from .. import store
@@ -189,6 +190,22 @@ def _finalize(reply: str, kb: str, tool_outputs: list) -> str:
     return bmt._drop_fabricated_links(reply, grounded)
 
 
+def _msg_create(client, **kw):
+    """Gọi Claude có THỬ LẠI khi lỗi TẠM THỜI (quá tải 529 / nghẽn mạng) — như llm.chat, để đỡ 'nghẽn'."""
+    from . import llm
+    last = None
+    for attempt in range(3):
+        try:
+            return client.messages.create(**kw)
+        except Exception as e:  # noqa: BLE001
+            last = e
+            if llm._is_retryable(e) and attempt < 2:
+                time.sleep(1.5 * (attempt + 1))  # 1.5s, 3s
+                continue
+            raise
+    raise last
+
+
 def answer(question: str, asker_name: str = "", persona: str = "",
            thread_id: str | None = None, is_group: bool = False, uid: str = "") -> str:
     """Agent trả lời khách (tự dùng công cụ). Gemini → lùi về bot cũ."""
@@ -206,8 +223,8 @@ def answer(question: str, asker_name: str = "", persona: str = "",
     system = _system(persona, kb, cust_mem)
 
     for _ in range(MAX_TOOL_ROUNDS):
-        resp = client.messages.create(model=config.anthropic_model, max_tokens=900,
-                                       system=system, tools=TOOLS, messages=messages)
+        resp = _msg_create(client, model=config.anthropic_model, max_tokens=900,
+                           system=system, tools=TOOLS, messages=messages)
         if resp.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": resp.content})
             results = []
@@ -220,12 +237,14 @@ def answer(question: str, asker_name: str = "", persona: str = "",
             continue
         return _finalize(bmt._strip_markdown(
             "".join(b.text for b in resp.content if b.type == "text").strip()), kb, tool_outputs)
-    # Hết vòng công cụ mà chưa có câu trả lời → ép soạn câu cuối từ dữ liệu đã có (không quét công cụ nữa).
+    # Hết vòng công cụ → ép soạn câu cuối từ dữ liệu đã có. PHẢI vẫn truyền tools (vì lịch sử có tool_use;
+    # thiếu tools → API từ chối 400 → trả rỗng "nghẽn"), nhưng tool_choice='none' để bắt buộc soạn CHỮ.
     try:
-        final = client.messages.create(model=config.anthropic_model, max_tokens=900,
-                                        system=system, messages=messages)
-        return _finalize(bmt._strip_markdown(
-            "".join(b.text for b in final.content if b.type == "text").strip()), kb, tool_outputs)
+        final = _msg_create(client, model=config.anthropic_model, max_tokens=900, system=system,
+                            tools=TOOLS, tool_choice={"type": "none"}, messages=messages)
+        text = "".join(b.text for b in final.content if b.type == "text").strip()
+        return _finalize(bmt._strip_markdown(text), kb, tool_outputs) if text else \
+            "Anh/chị ơi, cho em xin lỗi, câu này hơi nhiều ý nên em chưa gộp kịp — anh/chị hỏi lại từng phần giúp em nhé 🏸"
     except Exception:  # noqa: BLE001
         return ""  # endpoint sẽ trả câu xin lỗi
 
