@@ -6,3 +6,4 @@ matplotlib>=3.7.0                       # Vẽ biểu đồ báo cáo
 python-dotenv>=1.0.0                    # Đọc file .env
 flask>=3.0.0                            # Trang quản trị localhost
 Pillow>=10.0.0                          # Đọc màu ảnh lưới lịch sân alobo (canh sân)
+waitress>=3.0

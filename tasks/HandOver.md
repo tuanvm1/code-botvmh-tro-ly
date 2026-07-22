@@ -1,5 +1,20 @@
 # Bàn giao — Trợ lý tự động (cập nhật 22/7/2026)
 
+## (22/7 chiều) SỬA "NGHẼN" khi NHIỀU NGƯỜI HỎI CÙNG LÚC — quan trọng
+Chủ báo: câu 1 OK, câu 2 nghẽn; lo 100 người tag cùng lúc. GỐC RỄ: `app/admin/server.py::run` chạy Flask
+DEV SERVER 1-LUỒNG (`app.run`) → chỉ xử 1 tin/lúc; câu đọc lịch chậm (~40-80s) ôm nguyên máy chủ → tin khác nghẽn.
+ĐÃ SỬA:
+- server.py: dùng **waitress** (24 luồng, channel_timeout=300, connection_limit=300) thay app.run; dự phòng
+  app.run(threaded=True). Đã thêm `waitress>=3.0` vào requirements + cài trên VPS.
+- zalo_agent.answer: (a) `_msg_create` THỬ LẠI khi Claude 529/nghẽn (trước không có → nghẽn); (b) lượt chốt
+  câu cuối vẫn truyền tools + tool_choice='none' (thiếu tools khi history có tool_use → API 400 → rỗng âm thầm);
+  (c) AI trả RỖNG → câu lịch sự "nhắn lại giúp em" thay vì "nghẽn"; (d) bọc try/except GHI traceback ra stderr
+  (journal) để hết "nuốt lỗi âm thầm".
+KIỂM CHỨNG: 20 câu ĐỒNG THỜI → 20/20 trả lời tốt, 0 nghẽn (trước sửa: câu 2 khi câu 1 đang chạy = nghẽn).
+Câu đọc lịch chạy SONG SONG không chặn câu khác. LƯU Ý SCALE: 100+ người/lúc → giới hạn còn ở RATE LIMIT của
+Anthropic (retry đỡ được cơn tạm; nếu cần bền hơn: thêm hàng đợi/giới hạn tần suất). Đọc lịch vẫn bị nút cổ chai
+1 Chrome/2GB nhưng cache 5' + khoá file gói lại còn ~3 lần đọc/5 phút (mỗi cơ sở).
+
 ## HAI KHO GITHUB (ĐỪNG NHẦM — vai trò KHÁC HẲN)
 - `tuanvm1/bonaobotVMH` = KHO KIẾN THỨC bot đọc (LIVE): chủ sửa Obsidian `Documents/bonaoVMH` → auto-push →
   VPS kéo mỗi 3 phút vào data/bot-kb → bot đọc để trả lời khách. BẮT BUỘC GIỮ + DÙNG (xoá = bot mất kiến thức sửa-được).

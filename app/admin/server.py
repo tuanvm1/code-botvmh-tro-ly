@@ -703,4 +703,11 @@ def run(host: str = "127.0.0.1", port: int = 8760, manage_bot: bool = True):
     if manage_bot:
         supervisor.start()        # bot Telegram
         zalo_supervisor.start()   # dịch vụ Zalo (nếu có tài khoản cá nhân bật)
-    app.run(host=host, port=port, debug=False)
+    # CHỊU TẢI NHIỀU NGƯỜI CÙNG LÚC: dùng waitress (nhiều luồng) thay dev server 1-luồng (dev server xử lý
+    # từng yêu cầu một → 100 người tag cùng lúc là NGHẼN). Đọc lịch chậm (~40s) do 1 luồng ôm, các luồng khác
+    # vẫn phục vụ được. (Đọc lịch trùng cơ sở đã có cache 5 phút + khoá file nên không bung Chrome ồ ạt.)
+    try:
+        from waitress import serve
+        serve(app, host=host, port=port, threads=24, channel_timeout=300, connection_limit=300)
+    except ImportError:
+        app.run(host=host, port=port, debug=False, threaded=True)  # dự phòng: ít nhất cũng đa-luồng

@@ -213,40 +213,47 @@ def answer(question: str, asker_name: str = "", persona: str = "",
     if llm.provider() == "gemini":
         return bmt.answer(question, asker_name, persona, thread_id, is_group)
 
-    kb = kb_folder.combined_knowledge(question)
-    cust_mem = store.customer_memory_text(uid)
-    who = f"(Người hỏi tên {asker_name}) " if asker_name else ""
-    conv = bmt._conversation_block(thread_id, question, is_group)
-    messages = [{"role": "user", "content": who + conv}]
-    tool_outputs: list[str] = []
-    client = _client()
-    system = _system(persona, kb, cust_mem)
-
-    for _ in range(MAX_TOOL_ROUNDS):
-        resp = _msg_create(client, model=config.anthropic_model, max_tokens=900,
-                           system=system, tools=TOOLS, messages=messages)
-        if resp.stop_reason == "tool_use":
-            messages.append({"role": "assistant", "content": resp.content})
-            results = []
-            for block in resp.content:
-                if getattr(block, "type", None) == "tool_use":
-                    out = _dispatch(block.name, block.input or {}, uid, asker_name)
-                    tool_outputs.append(out)
-                    results.append({"type": "tool_result", "tool_use_id": block.id, "content": out})
-            messages.append({"role": "user", "content": results})
-            continue
-        return _finalize(bmt._strip_markdown(
-            "".join(b.text for b in resp.content if b.type == "text").strip()), kb, tool_outputs)
-    # Hết vòng công cụ → ép soạn câu cuối từ dữ liệu đã có. PHẢI vẫn truyền tools (vì lịch sử có tool_use;
-    # thiếu tools → API từ chối 400 → trả rỗng "nghẽn"), nhưng tool_choice='none' để bắt buộc soạn CHỮ.
+    import sys
     try:
+        kb = kb_folder.combined_knowledge(question)
+        cust_mem = store.customer_memory_text(uid)
+        who = f"(Người hỏi tên {asker_name}) " if asker_name else ""
+        conv = bmt._conversation_block(thread_id, question, is_group)
+        messages = [{"role": "user", "content": who + conv}]
+        tool_outputs: list[str] = []
+        client = _client()
+        system = _system(persona, kb, cust_mem)
+
+        for _ in range(MAX_TOOL_ROUNDS):
+            resp = _msg_create(client, model=config.anthropic_model, max_tokens=900,
+                               system=system, tools=TOOLS, messages=messages)
+            if resp.stop_reason == "tool_use":
+                messages.append({"role": "assistant", "content": resp.content})
+                results = []
+                for block in resp.content:
+                    if getattr(block, "type", None) == "tool_use":
+                        out = _dispatch(block.name, block.input or {}, uid, asker_name)
+                        tool_outputs.append(out)
+                        results.append({"type": "tool_result", "tool_use_id": block.id, "content": out})
+                messages.append({"role": "user", "content": results})
+                continue
+            text = "".join(b.text for b in resp.content if b.type == "text").strip()
+            reply = _finalize(bmt._strip_markdown(text), kb, tool_outputs) if text else ""
+            # AI trả RỖNG một nhịp (hiếm, hay gặp lúc tải cao) → câu lịch sự thay vì "nghẽn" khó chịu.
+            return reply if reply.strip() else \
+                "Anh/chị ơi, em chưa nghe rõ ý mình á 😅 anh/chị nhắn lại giúp em một chút nha 🏸"
+        # Hết vòng công cụ → ép soạn câu cuối. PHẢI vẫn truyền tools (lịch sử có tool_use; thiếu tools → API
+        # 400 → rỗng "nghẽn"), tool_choice='none' để bắt buộc soạn CHỮ.
         final = _msg_create(client, model=config.anthropic_model, max_tokens=900, system=system,
                             tools=TOOLS, tool_choice={"type": "none"}, messages=messages)
         text = "".join(b.text for b in final.content if b.type == "text").strip()
         return _finalize(bmt._strip_markdown(text), kb, tool_outputs) if text else \
-            "Anh/chị ơi, cho em xin lỗi, câu này hơi nhiều ý nên em chưa gộp kịp — anh/chị hỏi lại từng phần giúp em nhé 🏸"
-    except Exception:  # noqa: BLE001
-        return ""  # endpoint sẽ trả câu xin lỗi
+            "Anh/chị ơi, cho em xin lỗi, câu này hơi nhiều ý nên em chưa gộp kịp — anh/chị hỏi lại từng phần nhé 🏸"
+    except Exception as e:  # noqa: BLE001 — GHI RÕ lý do ra nhật ký để chẩn đoán "nghẽn"
+        import traceback
+        print(f"[ZALO_AGENT] LỖI answer() câu «{(question or '')[:80]}»: {e!r}", file=sys.stderr, flush=True)
+        traceback.print_exc(file=sys.stderr)
+        return ""  # endpoint trả câu xin lỗi
 
 
 def owner_daily_summary(msgs: list) -> str:
