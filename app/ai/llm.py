@@ -10,12 +10,36 @@ messages: danh sách [{"role": "user"|"assistant", "content": "..."}]
 """
 from __future__ import annotations
 
+import os
+import threading
 import time
+from contextlib import contextmanager
 
 import requests
 
 from .. import store
 from .content import AIError
+
+
+# ---- HÀNG ĐỢI AI: giới hạn số lời gọi AI ĐỒNG THỜI (chống 100 người hỏi cùng lúc làm nghẽn/quá hạn mức) ----
+# Số dư vượt giới hạn sẽ XẾP HÀNG chờ tới lượt. Chờ quá lâu → báo "bận, chờ chút" thay vì treo/nghẽn.
+_AI_MAX = max(1, int(os.environ.get("AI_MAX_CONCURRENT", "8")))      # số lời gọi AI song song tối đa
+_AI_WAIT = float(os.environ.get("AI_QUEUE_TIMEOUT", "75"))          # giây chờ tối đa 1 chỗ trong hàng đợi
+_AI_GATE = threading.BoundedSemaphore(_AI_MAX)
+
+
+class AIBusy(Exception):
+    """Hàng đợi AI đầy (quá tải tức thời) — nên báo khách chờ chút, đừng để treo."""
+
+
+@contextmanager
+def ai_slot():
+    if not _AI_GATE.acquire(timeout=_AI_WAIT):
+        raise AIBusy()
+    try:
+        yield
+    finally:
+        _AI_GATE.release()
 
 
 _RETRY_CODES = {408, 409, 425, 429, 500, 502, 503, 504, 529}
@@ -76,12 +100,13 @@ def _claude(system: str, messages: list[dict], max_tokens: int) -> str:
     from .content import _client
     from ..config import config
     client = _client()
-    msg = client.messages.create(
-        model=config.anthropic_model,
-        max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": m["role"], "content": m["content"]} for m in messages],
-    )
+    with ai_slot():   # xếp hàng nếu đang có quá nhiều lời gọi AI cùng lúc
+        msg = client.messages.create(
+            model=config.anthropic_model,
+            max_tokens=max_tokens,
+            system=system,
+            messages=[{"role": m["role"], "content": m["content"]} for m in messages],
+        )
     return "".join(b.text for b in msg.content if b.type == "text").strip()
 
 
@@ -103,7 +128,10 @@ def _gemini(system: str, messages: list[dict], max_tokens: int) -> str:
     if system:
         body["systemInstruction"] = {"parts": [{"text": system}]}
     try:
-        r = requests.post(url, params={"key": key}, json=body, timeout=40)
+        with ai_slot():   # xếp hàng chung với Claude
+            r = requests.post(url, params={"key": key}, json=body, timeout=40)
+    except AIBusy:
+        raise
     except Exception as e:  # noqa: BLE001
         raise AIError(f"Gọi Gemini lỗi mạng: {e}")
     if r.status_code != 200:

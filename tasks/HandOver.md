@@ -10,7 +10,13 @@ DEV SERVER 1-LUỒNG (`app.run`) → chỉ xử 1 tin/lúc; câu đọc lịch c
   câu cuối vẫn truyền tools + tool_choice='none' (thiếu tools khi history có tool_use → API 400 → rỗng âm thầm);
   (c) AI trả RỖNG → câu lịch sự "nhắn lại giúp em" thay vì "nghẽn"; (d) bọc try/except GHI traceback ra stderr
   (journal) để hết "nuốt lỗi âm thầm".
-KIỂM CHỨNG: 20 câu ĐỒNG THỜI → 20/20 trả lời tốt, 0 nghẽn (trước sửa: câu 2 khi câu 1 đang chạy = nghẽn).
+HÀNG ĐỢI AI (22/7, thêm theo yêu cầu chủ): `llm.py` có `ai_slot()` (BoundedSemaphore) giới hạn số lời gọi AI
+ĐỒNG THỜI = env `AI_MAX_CONCURRENT` (mặc định 8); dư thì XẾP HÀNG; chờ > `AI_QUEUE_TIMEOUT` (75s) → `AIBusy`.
+Bọc quanh `llm._claude`/`_gemini` + `zalo_agent._msg_create`. `zalo_agent.answer` bắt AIBusy → câu "đông khách,
+chờ chút" (không nghẽn). Mục đích: 100+ người dồn 1 lúc → không bắn 100 lời gọi cùng lúc (né rate-limit Anthropic)
+mà rải đều 8 cái/lượt. KIỂM CHỨNG: 30 câu ĐỒNG THỜI → 30/30 tốt, 0 nghẽn, xong trong 31s. Tùy tier Anthropic có
+thể chỉnh AI_MAX_CONCURRENT (systemd env). Đọc lịch KHÔNG chiếm slot AI (chỉ khoá file riêng) nên không kẹt hàng đợi.
+KIỂM CHỨNG (trước khi có hàng đợi): 20 câu ĐỒNG THỜI → 20/20 trả lời tốt, 0 nghẽn (trước sửa: câu 2 khi câu 1 đang chạy = nghẽn).
 Câu đọc lịch chạy SONG SONG không chặn câu khác. LƯU Ý SCALE: 100+ người/lúc → giới hạn còn ở RATE LIMIT của
 Anthropic (retry đỡ được cơn tạm; nếu cần bền hơn: thêm hàng đợi/giới hạn tần suất). Đọc lịch vẫn bị nút cổ chai
 1 Chrome/2GB nhưng cache 5' + khoá file gói lại còn ~3 lần đọc/5 phút (mỗi cơ sở).
