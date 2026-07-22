@@ -252,6 +252,8 @@ def t_badminton_smart():
                             "windows": "05:00-24:00", "enabled": "on"})
         store.create_venue({"name": "VMH Hạ Long", "slug": "sport_vmh_badminton_cn3",
                             "windows": "05:00-24:00", "enabled": "on"})
+        # Cầu lông: emoji sai môn (tennis/bóng bàn) tự đổi → 🏸
+        assert "🎾" not in B._strip_markdown("còn sân 🎾 nha") and "🏸" in B._strip_markdown("còn sân 🎾 nha")
         # Hàng rào chống BỊA LINK: giữ URL có trong dữ liệu, bỏ URL lạ do bot tự chế
         g = "đặt tại https://datlich.alobo.vn/san/x"
         r = B._drop_fabricated_links("đặt: https://datlich.alobo.vn/san/x, map https://maps.app.goo.gl/FAKE nha", g)

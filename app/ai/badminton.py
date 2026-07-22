@@ -33,6 +33,9 @@ def _strip_markdown(text: str) -> str:
     t = re.sub(r"^\s{0,3}#{1,6}\s*", "", t, flags=re.M)
     t = re.sub(r"^\s*([-*_])\1{2,}\s*$", "", t, flags=re.M)   # đường kẻ ngang markdown (--- *** ___)
     t = re.sub(r"\n{3,}", "\n\n", t)
+    # Cầu lông: đổi emoji SAI môn (tennis/bóng bàn/các bóng khác) → 🏸
+    for _wrong in ("🎾", "🏓", "🎱", "🏀", "⚽", "🏈", "⚾", "🥎", "🏐"):
+        t = t.replace(_wrong, "🏸")
     return t.strip()
 
 

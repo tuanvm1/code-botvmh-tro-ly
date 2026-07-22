@@ -1,5 +1,14 @@
 # Bàn giao — Trợ lý tự động (cập nhật 22/7/2026)
 
+## HAI KHO GITHUB (ĐỪNG NHẦM — vai trò KHÁC HẲN)
+- `tuanvm1/bonaobotVMH` = KHO KIẾN THỨC bot đọc (LIVE): chủ sửa Obsidian `Documents/bonaoVMH` → auto-push →
+  VPS kéo mỗi 3 phút vào data/bot-kb → bot đọc để trả lời khách. BẮT BUỘC GIỮ + DÙNG (xoá = bot mất kiến thức sửa-được).
+- `tuanvm1/code-botvmh-tro-ly` = SAO LƯU MÃ NGUỒN (private), tag `v1.0.0` (22/7). Chỉ để backup/khôi phục code, KHÔNG
+  chạy runtime. Push từ Mac qua SSH key `github_bo_nao`. .gitignore loại .env/data/session/log/node_modules
+  (đã soi kỹ không lọt bí mật; suýt lọt data/zalo_session.json do .gitignore ghi chú cùng dòng — đã sửa).
+  KHÔNG gộp 2 kho (nhét code vào bonaobotVMH → VPS kéo về, bot đọc nhầm tasks/*.md làm kiến thức + lộ IP nội bộ).
+
+
 ## (22/7) BOT ZALO → AGENT THÔNG MINH (dùng công cụ) + BẢO MẬT — ✅ XONG, chạy thật VPS
 File mới `app/ai/zalo_agent.py` (Claude tool-use) THAY badminton.answer làm bộ não bot khách (server.py
 /internal/zalo-reply gọi zalo_agent.answer(...,uid)). Gemini → tự lùi badminton.answer. selftest 12/12.
