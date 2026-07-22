@@ -1,0 +1,12 @@
+{
+  "name": "zalo-service",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dịch vụ Zalo (zca-js) cho trợ lý tự động",
+  "dependencies": {
+    "express": "^5.2.1",
+    "qrcode": "^1.5.4",
+    "zca-js": "^2.1.2"
+  }
+}

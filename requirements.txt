@@ -1,0 +1,8 @@
+# Thư viện cần cho Giai đoạn 1
+python-telegram-bot[job-queue]==21.9   # Bot Telegram + hẹn giờ (JobQueue)
+anthropic>=0.40.0                       # Gọi Claude viết nội dung + phân tích
+requests>=2.31.0                        # Gọi Facebook Graph API
+matplotlib>=3.7.0                       # Vẽ biểu đồ báo cáo
+python-dotenv>=1.0.0                    # Đọc file .env
+flask>=3.0.0                            # Trang quản trị localhost
+Pillow>=10.0.0                          # Đọc màu ảnh lưới lịch sân alobo (canh sân)
