@@ -8,7 +8,12 @@
 - **Bộ não bằng Obsidian**: chủ sửa ghi chú trong kho `Documents/bonaoVMH` → tự đồng bộ lên bot (Mac tự đẩy →
   GitHub `tuanvm1/bonaobotVMH` → máy chủ tự kéo mỗi ~3 phút). Không cần bấm nút.
 - **Đọc lịch sân alobo THẬT** khi khách hỏi + canh sân báo nhóm Zalo (10h/14h hôm nay, 22h ngày mai).
-- Chạy 24/7 trên VPS Việt Nam (systemd `trolybot`). Bộ tự kiểm tra **12/12**. Đã qua 3 vòng review đối kháng.
+- **Chịu tải nhiều người cùng lúc**: web server đa-luồng (waitress) + HÀNG ĐỢI AI (8 lời gọi/lượt, dư thì xếp
+  hàng xử lý lần lượt, không nghẽn). Đã test 30 câu đồng thời → 30/30 OK.
+- **Chạy trong MỌI nhóm bot tham gia** (không cần khai báo): trả lời khi được @tag. Báo sân tự động gửi các nhóm
+  trong `group_ids` (hiện: "vmh bot test" + "Nhóm thuê sân VMH - Giao lưu cầu lông"). Tin gửi chung xưng "anh/chị";
+  bot gọi đúng anh/chị khi biết tên/giới tính.
+- Chạy 24/7 trên VPS Việt Nam (systemd `trolybot`). Bộ tự kiểm tra **12/12**. Đã qua 4 vòng review đối kháng.
 
 ## 👉 VIỆC CHỦ NÊN LÀM (theo thứ tự nên làm trước)
 1. **Điền số liệu THẬT vào kho Obsidian `bonaoVMH`** — quan trọng nhất để bot trả lời đúng:
