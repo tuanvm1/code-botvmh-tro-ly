@@ -252,8 +252,6 @@ def answer(question: str, asker_name: str = "", persona: str = "",
         text = "".join(b.text for b in final.content if b.type == "text").strip()
         return _finalize(bmt._strip_markdown(text), kb, tool_outputs) if text else \
             "Anh/chị ơi, cho em xin lỗi, câu này hơi nhiều ý nên em chưa gộp kịp — anh/chị hỏi lại từng phần nhé 🏸"
-    except llm.AIBusy:   # hàng đợi AI đầy (rất đông cùng lúc) → báo khách chờ, đừng "nghẽn"
-        return "Dạ đang đông khách hỏi quá nên em hơi chậm 😅 anh/chị chờ em một chút rồi nhắn lại giúp em nha 🏸"
     except Exception as e:  # noqa: BLE001 — GHI RÕ lý do ra nhật ký để chẩn đoán "nghẽn"
         import traceback
         print(f"[ZALO_AGENT] LỖI answer() câu «{(question or '')[:80]}»: {e!r}", file=sys.stderr, flush=True)

@@ -21,21 +21,19 @@ from .. import store
 from .content import AIError
 
 
-# ---- HÀNG ĐỢI AI: giới hạn số lời gọi AI ĐỒNG THỜI (chống 100 người hỏi cùng lúc làm nghẽn/quá hạn mức) ----
-# Số dư vượt giới hạn sẽ XẾP HÀNG chờ tới lượt. Chờ quá lâu → báo "bận, chờ chút" thay vì treo/nghẽn.
+# ---- HÀNG ĐỢI AI: giới hạn số lời gọi AI ĐỒNG THỜI (chống 100 người hỏi cùng lúc làm quá hạn mức Anthropic) ----
+# Số dư vượt giới hạn sẽ XẾP HÀNG CHỜ TỚI LƯỢT — xử lý lần lượt từng người, KHÔNG bỏ cuộc, KHÔNG báo bận.
 _AI_MAX = max(1, int(os.environ.get("AI_MAX_CONCURRENT", "8")))      # số lời gọi AI song song tối đa
-_AI_WAIT = float(os.environ.get("AI_QUEUE_TIMEOUT", "75"))          # giây chờ tối đa 1 chỗ trong hàng đợi
 _AI_GATE = threading.BoundedSemaphore(_AI_MAX)
 
 
 class AIBusy(Exception):
-    """Hàng đợi AI đầy (quá tải tức thời) — nên báo khách chờ chút, đừng để treo."""
+    """(Không dùng nữa) — giữ lại để code cũ tham chiếu không lỗi."""
 
 
 @contextmanager
 def ai_slot():
-    if not _AI_GATE.acquire(timeout=_AI_WAIT):
-        raise AIBusy()
+    _AI_GATE.acquire()   # chờ tới lượt (chặn cho tới khi có chỗ) — ai cũng được xử lý, chỉ là theo thứ tự
     try:
         yield
     finally:
