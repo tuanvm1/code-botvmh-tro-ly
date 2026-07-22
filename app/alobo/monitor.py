@@ -192,9 +192,9 @@ def compose_combined_digest(items: list[tuple], date_iso: str,
         return ""
     d = _dt.strptime(date_iso, "%Y-%m-%d").strftime("%d/%m")
     lines = [random.choice([
-        f"🏸 LỊCH SÂN TRỐNG {when_label.upper()} ({d}) — VMH BADMINTON 👇",
-        f"🏸 Sân trống {when_label} ({d}) — cập nhật cả 3 cơ sở VMH 👇",
-        f"🏸 Cập nhật sân trống {when_label} ({d}) tại VMH 👇",
+        f"🏸 Anh/chị ơi, LỊCH SÂN TRỐNG {when_label.upper()} ({d}) tại VMH đây ạ 👇",
+        f"🏸 VMH xin cập nhật sân trống {when_label} ({d}) gửi anh/chị nè 👇",
+        f"🏸 Anh/chị ơi, còn các khung trống {when_label} ({d}) tại VMH 👇",
     ]), ""]
     for name, slug, rngs in have:
         lines.append(f"📍 {name}")
@@ -208,6 +208,7 @@ def compose_combined_digest(items: list[tuple], date_iso: str,
         if slug:
             lines.append(f"   🔗 Đặt sân: {ALOBO_BASE}{slug}")
         lines.append("")
+    lines.append("Anh/chị bấm link đặt sân để giữ khung ưng ý nhé, sân dễ hết lắm ạ 🏸")
     return "\n".join(lines).strip()
 
 
